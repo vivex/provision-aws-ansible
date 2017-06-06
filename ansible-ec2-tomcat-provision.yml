@@ -1,0 +1,28 @@
+---
+### provision AWS EC/2 instances
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  user: root
+  pre_tasks:
+    - include_vars: group_vars/tomcat-servers.yml
+  roles:
+    - ec2-provision
+  post_tasks:
+    - name: refresh hosts inventory list
+      meta: refresh_inventory
+
+### install and configure Tomcat
+- hosts: tomcatservers
+  remote_user: ubuntu
+  vars:
+    TOMCAT_DIR: tomcat
+    TOMCAT_MAJOR: "8"
+    TOMCAT_VER: "8.5.15"
+    TOMCAT_MIRROR: "http://mirrors.advancedhosters.com/apache"
+    http_port: 8080
+    https_port: 8443
+    admin_username: admin
+    admin_password: adminsecret
+  roles:
+    - tomcat

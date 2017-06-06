@@ -1,0 +1,11 @@
+ec2_keypair: "dr-kp-us-east"
+ec2_security_group: "sg-bf5c70c0"
+ec2_instance_type: "t2.micro"
+ec2_image: "ami-49c9295f"
+ec2_subnet_ids: ['subnet-5d756d06','subnet-c0732fa5','subnet-7ff5b143']
+ec2_region: "us-east-1"
+ec2_tag_Role: "tomcat-shippable"
+ec2_tag_Type: "webserver"
+ec2_tag_Environment: "prod"
+ec2_volume_size: 8
+ec2_count: 2

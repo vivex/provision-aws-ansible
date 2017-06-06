@@ -1,0 +1,10 @@
+---
+- name: restart tomcat
+  become: yes
+  become_method: sudo
+  service: name=tomcat state=restarted
+
+- name: restart iptables
+  become: yes
+  become_method: sudo
+  service: name=iptables-persistent state=restarted

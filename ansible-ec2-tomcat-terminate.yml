@@ -1,0 +1,16 @@
+---
+### terminate AWS EC/2 instances
+- hosts: tomcatservers
+  connection: local
+  gather_facts: false
+  user: root
+  pre_tasks:
+    - include_vars: group_vars/tomcat-servers.yml
+  tasks:
+    - name: Terminate instances with tag Role = {{ ec2_tag_Role }}
+      ec2:
+        region: "{{ ec2_region }}"
+        instance_ids: "{{ ec2_id }}"
+        state: 'absent'
+        wait: true
+      delegate_to: "localhost"

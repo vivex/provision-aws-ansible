@@ -1,0 +1,217 @@
+---
+- name: install Java if it isn't installed
+  become: true
+  become_method: sudo
+  apt: 
+    name: default-jdk
+    state: present 
+    update_cache: yes
+    install_recommends: no
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_release == "trusty"
+ 
+# - name: set JAVA_HOME variable
+#   become: true
+#   become_method: sudo
+#   lineinfile:
+#     dest: /etc/environment
+#     state: present
+#     regexp: '^export JAVA_HOME='
+#     line: 'export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64'
+
+- name: create directory for tomcat
+  become: yes
+  become_method: sudo
+  file: 
+    path: /opt/{{ TOMCAT_DIR }}
+    state: directory
+    mode: 0755
+
+- name: check if tomcat already installed
+  stat: 
+    path: /opt/tomcat/bin 
+  register: tomcat_installed
+
+- name: download tomcat
+  become: yes
+  become_method: sudo
+  get_url: 
+    url: "{{ TOMCAT_MIRROR }}/tomcat/tomcat-{{ TOMCAT_MAJOR }}/v{{ TOMCAT_VER }}/bin/apache-tomcat-{{ TOMCAT_VER }}.zip" 
+    dest: /opt/{{ TOMCAT_DIR }}
+    mode: 0440
+  when: tomcat_installed.stat.exists != true
+
+- name: install unzip
+  become: yes
+  become_method: sudo
+  apt:
+    name: unzip
+    state: present
+    update_cache: yes
+    install_recommends: no
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_release == "trusty"
+
+- name: unzip tomcat install files
+  become: yes
+  become_method: sudo
+  unarchive:
+    src: /opt/{{ TOMCAT_DIR }}/apache-tomcat-{{ TOMCAT_VER }}.zip
+    dest: /opt/{{ TOMCAT_DIR }}
+    remote_src: true
+  when: tomcat_installed.stat.exists != true
+
+- name: copy unzipped files up one directory
+  become: yes
+  become_method: sudo
+  shell: cp -R /opt/{{ TOMCAT_DIR }}/apache-tomcat-{{ TOMCAT_VER }}/* /opt/{{ TOMCAT_DIR }} 
+  args:
+    creates: /opt/{{ TOMCAT_DIR }}/bin
+
+- name: remove tomcat install file/dir
+  become: yes
+  become_method: sudo
+  file: 
+    name: /opt/{{ TOMCAT_DIR }}/{{ item }}
+    state: absent
+  with_items:
+    - apache-tomcat-{{ TOMCAT_VER }}.zip
+    - apache-tomcat-{{ TOMCAT_VER }}/
+
+- name: add tomcat group
+  become: yes
+  become_method: sudo
+  group:
+    name: tomcat
+    state: present
+
+- name: allow tomcat group to have passwordless sudo
+  become: yes
+  become_method: sudo
+  lineinfile:
+    dest: /etc/sudoers.d/tomcat
+    state: present
+    create: yes
+    regexp: '^%tomcat'
+    line: '%tomcat ALL=(ALL) NOPASSWD: ALL'
+    validate: visudo -cf %s
+
+- name: add tomcat user
+  become: yes
+  become_method: sudo
+  user:
+    name: tomcat
+    state: present
+    groups: tomcat
+
+- name: add tomcat users to sudo group
+  become: yes
+  become_method: sudo
+  user: 
+    name: tomcat
+    groups: sudo
+    append: yes
+
+- name: ensure scripts are executable
+  become: yes
+  become_method: sudo
+  shell: chmod 755 /opt/{{ TOMCAT_DIR }}/bin/*.sh 
+
+- name: ensure necessary folders are writeable
+  become: yes
+  become_method: sudo
+  file:
+    path: /opt/{{ TOMCAT_DIR }}/{{ item }}
+    state: directory
+    mode: 0775
+  with_items:
+    - webapps
+    - conf
+    - logs
+
+- name: change tomcat directory ownership
+  become: yes
+  become_method: sudo
+  file:
+    path: /opt/tomcat
+    owner: tomcat
+    group: tomcat
+    recurse: yes
+
+- name: Configure Tomcat server
+  become: yes
+  become_method: sudo
+  template: src=server.xml dest=/opt/{{ TOMCAT_DIR }}/conf/
+  notify: restart tomcat
+
+- name: Configure Tomcat users
+  become: yes
+  become_method: sudo
+  template: src=tomcat-users.xml dest=/opt/{{ TOMCAT_DIR }}/conf/
+  notify: restart tomcat
+
+- name: Install Tomcat init script
+  become: yes
+  become_method: sudo
+  copy: src=tomcat-initscript.sh dest=/etc/init.d/tomcat mode=0755
+
+- name: enable Tomcat service
+  become: yes
+  become_method: sudo
+  service: name=tomcat enabled=yes
+
+- name: start Tomcat service
+  become: yes
+  become_method: sudo
+  service: name=tomcat state=started 
+
+- name: install iptables-persistent
+  become: yes
+  become_method: sudo
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  apt:
+    name: iptables-persistent
+    state: present
+    update_cache: yes
+    install_recommends: no
+  when: ansible_distribution == "Ubuntu" 
+
+- name: start iptables-persistent
+  become: yes
+  become_method: sudo
+  service: name=iptables-persistent state=started enabled=yes
+
+- name: deploy iptables rules
+  become: yes
+  become_method: sudo
+  template: src=iptables-save dest=/etc/iptables/rules.v4
+  notify: restart iptables
+
+- name: install firewalld
+  become: yes
+  become_method: sudo
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  apt:
+    name: firewalld
+    state: present
+    update_cache: yes
+    install_recommends: no
+  when: ansible_distribution == "Ubuntu" 
+
+- name: insert firewalld rule for tomcat http port
+  become: yes
+  become_method: sudo
+  firewalld: port={{ http_port }}/tcp permanent=true state=enabled immediate=yes
+  when: 'ansible_distribution == "Ubuntu"'
+
+- name: insert firewalld rule for tomcat https port
+  become: yes
+  become_method: sudo
+  firewalld: port={{ https_port }}/tcp permanent=true state=enabled immediate=yes
+  when: 'ansible_distribution == "Ubuntu"'
+
+- name: wait for tomcat to start
+  become: yes
+  become_method: sudo
+  wait_for: port={{http_port}}
+

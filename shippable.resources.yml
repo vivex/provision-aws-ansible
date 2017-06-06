@@ -1,0 +1,31 @@
+resources:
+
+# resources for sample provisioning pipeline using Ansible
+
+################################
+
+# config for awscli 
+  - name: provision_aws_ansible_cli
+    type: cliConfig
+    integration: dr-aws # replace with your AWS integration name
+    pointer:
+      region: us-east-1
+    flags:
+      - provision-aws-ansible
+
+# GitHub repo holding Ansible scripts to be used in pipeline
+  - name: provision_aws_ansible_repo
+    type: gitRepo
+    integration: dr-github # replace with your GitHub integration name
+    pointer:
+      sourceName: devops-recipes/provision-aws-ansible
+      branch: master
+    flags:
+      - provision-aws-ansible
+
+# PEM key for connecting to EC/2 instances
+  - name: provision_aws_ansible_keypair
+    type: integration
+    integration: dr-keypair-us-east # replace with your SSH/PEM integration name
+    flags:
+      - provision-aws-ansible
