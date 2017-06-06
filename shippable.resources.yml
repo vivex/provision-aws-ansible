@@ -18,7 +18,7 @@ resources:
     type: gitRepo
     integration: dr-github # replace with your GitHub integration name
     pointer:
-      sourceName: devops-recipes/provision-aws-ansible
+      sourceName: vivex/provision-aws-ansible
       branch: master
     flags:
       - provision-aws-ansible
